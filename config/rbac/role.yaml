@@ -1,0 +1,59 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - children
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - children/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - children/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - parents
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - parents/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - parents/status
+  verbs:
+  - get
+  - patch
+  - update

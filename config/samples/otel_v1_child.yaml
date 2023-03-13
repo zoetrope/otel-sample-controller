@@ -1,0 +1,12 @@
+apiVersion: otel.zoetrope.github.io/v1
+kind: Child
+metadata:
+  labels:
+    app.kubernetes.io/name: child
+    app.kubernetes.io/instance: child-sample
+    app.kubernetes.io/part-of: otel-sample-controller
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: otel-sample-controller
+  name: child-sample
+spec:
+  # TODO(user): Add fields here

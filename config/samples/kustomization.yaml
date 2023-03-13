@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- otel_v1_parent.yaml
+- otel_v1_child.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

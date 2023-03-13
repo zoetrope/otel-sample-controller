@@ -1,0 +1,27 @@
+# permissions for end users to view parents.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: parent-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: otel-sample-controller
+    app.kubernetes.io/part-of: otel-sample-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: parent-viewer-role
+rules:
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - parents
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - otel.zoetrope.github.io
+  resources:
+  - parents/status
+  verbs:
+  - get
