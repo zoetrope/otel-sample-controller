@@ -1,0 +1,18 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+      grpc:
+processors:
+exporters:
+  otlphttp:
+    endpoint: http://tempo.tempo.svc:4318
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: []
+      exporters: [otlphttp]
+  telemetry:
+    logs:
+      level: "debug"

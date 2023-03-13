@@ -19,18 +19,19 @@ package controller
 import (
 	"context"
 
+	otelv1 "github.com/zoetrope/otel-sample-controller/api/v1"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	otelv1 "github.com/zoetrope/otel-sample-controller/api/v1"
 )
 
 // ParentReconciler reconciles a Parent object
 type ParentReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Tracer trace.Tracer
 }
 
 //+kubebuilder:rbac:groups=otel.zoetrope.github.io,resources=parents,verbs=get;list;watch;create;update;patch;delete
@@ -47,6 +48,9 @@ type ParentReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ParentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	ctx, span := r.Tracer.Start(ctx, "Reconcile")
+	defer span.End()
+
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here

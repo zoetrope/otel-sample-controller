@@ -70,7 +70,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: controller:latest
+        image: otel-sample-controller:dev
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
@@ -98,5 +98,17 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
+      - args:
+        - --config=/conf/collector.yaml
+        image: otel/opentelemetry-collector:latest
+        imagePullPolicy: IfNotPresent
+        name: collector
+        volumeMounts:
+        - mountPath: /conf
+          name: otel-collector-conf-vol
+      volumes:
+       - configMap:
+           name: otel-collector-conf
+         name: otel-collector-conf-vol
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

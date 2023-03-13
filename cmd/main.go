@@ -17,22 +17,24 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"go.opentelemetry.io/otel"
 
 	otelv1 "github.com/zoetrope/otel-sample-controller/api/v1"
 	"github.com/zoetrope/otel-sample-controller/internal/controller"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -63,6 +65,19 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
+	client := otlptracehttp.NewClient(otlptracehttp.WithInsecure())
+	exporter, err := otlptrace.New(context.TODO(), client)
+	if err != nil {
+		setupLog.Error(err, "unable to initialize OpenTelemetry")
+		os.Exit(1)
+	}
+
+	provider := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+	)
+	defer provider.Shutdown(context.TODO())
+	otel.SetTracerProvider(provider)
+
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -92,6 +107,7 @@ func main() {
 	if err = (&controller.ParentReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Tracer: otel.Tracer("Parent"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Parent")
 		os.Exit(1)
@@ -99,6 +115,7 @@ func main() {
 	if err = (&controller.ChildReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Tracer: otel.Tracer("Child"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Child")
 		os.Exit(1)
