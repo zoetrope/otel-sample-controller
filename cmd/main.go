@@ -21,13 +21,14 @@ import (
 	"flag"
 	"os"
 
-	"go.opentelemetry.io/otel"
-
 	otelv1 "github.com/zoetrope/otel-sample-controller/api/v1"
 	"github.com/zoetrope/otel-sample-controller/internal/controller"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -74,6 +75,11 @@ func main() {
 
 	provider := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName("otel-sample-controller"),
+			semconv.ServiceVersion("0.0.1"),
+		)),
 	)
 	defer provider.Shutdown(context.TODO())
 	otel.SetTracerProvider(provider)
@@ -107,7 +113,7 @@ func main() {
 	if err = (&controller.ParentReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Tracer: otel.Tracer("Parent"),
+		Tracer: otel.Tracer("ParentController"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Parent")
 		os.Exit(1)
@@ -115,7 +121,7 @@ func main() {
 	if err = (&controller.ChildReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Tracer: otel.Tracer("Child"),
+		Tracer: otel.Tracer("ChildController"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Child")
 		os.Exit(1)

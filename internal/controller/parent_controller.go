@@ -21,9 +21,12 @@ import (
 
 	otelv1 "github.com/zoetrope/otel-sample-controller/api/v1"
 	"go.opentelemetry.io/otel/trace"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -48,12 +51,48 @@ type ParentReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ParentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	ctx, span := r.Tracer.Start(ctx, "Reconcile")
+	ctx, span := r.Tracer.Start(ctx, "parent-reconcile")
 	defer span.End()
 
-	_ = log.FromContext(ctx)
+	traceID := span.SpanContext().TraceID()
+	spanID := span.SpanContext().SpanID()
 
-	// TODO(user): your logic here
+	logger := log.FromContext(ctx).WithValues("traceID", traceID, "spanID", spanID)
+	logger.Info("Reconcile")
+
+	var parent otelv1.Parent
+	err := r.Get(ctx, req.NamespacedName, &parent)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			span.RecordError(err)
+		}
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	if !parent.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, nil
+	}
+
+	child := &otelv1.Child{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      parent.Name + "-child",
+			Namespace: parent.Namespace,
+		},
+	}
+	op, err := ctrl.CreateOrUpdate(ctx, r.Client, child, func() error {
+		if child.Annotations == nil {
+			child.Annotations = make(map[string]string)
+		}
+		child.Annotations["otel.zoetrope.github.io/trace_id"] = traceID.String()
+		child.Annotations["otel.zoetrope.github.io/span_id"] = spanID.String()
+		return ctrl.SetControllerReference(&parent, child, r.Scheme)
+	})
+	if err != nil {
+		span.RecordError(err)
+		return ctrl.Result{}, err
+	}
+	if op != controllerutil.OperationResultNone {
+		logger.Info("crate or update child successfully")
+	}
 
 	return ctrl.Result{}, nil
 }

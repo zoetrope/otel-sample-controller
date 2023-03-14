@@ -48,12 +48,47 @@ type ChildReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ChildReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	ctx, span := r.Tracer.Start(ctx, "Reconcile")
+	var child otelv1.Child
+	err := r.Get(ctx, req.NamespacedName, &child)
+	if err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	if !child.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, nil
+	}
+
+	spanCtx := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    trace.TraceID{},
+		SpanID:     trace.SpanID{},
+		TraceState: trace.TraceState{},
+		TraceFlags: 01,
+		Remote:     false,
+	})
+
+	if parentTraceID, ok := child.Annotations["otel.zoetrope.github.io/trace_id"]; ok {
+		traceID, err := trace.TraceIDFromHex(parentTraceID)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		spanCtx = spanCtx.WithTraceID(traceID)
+	}
+	if parentSpanID, ok := child.Annotations["otel.zoetrope.github.io/span_id"]; ok {
+		spanID, err := trace.SpanIDFromHex(parentSpanID)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		spanCtx = spanCtx.WithSpanID(spanID)
+	}
+	log.FromContext(ctx).Info("SpanContext is valid", "isValid", spanCtx.IsValid())
+
+	ctx, span := r.Tracer.Start(trace.ContextWithSpanContext(ctx, spanCtx), "child-reconcile")
 	defer span.End()
 
-	_ = log.FromContext(ctx)
+	traceID := span.SpanContext().TraceID()
+	spanID := span.SpanContext().SpanID()
 
-	// TODO(user): your logic here
+	logger := log.FromContext(ctx).WithValues("traceID", traceID, "spanID", spanID)
+	logger.Info("Reconcile")
 
 	return ctrl.Result{}, nil
 }
